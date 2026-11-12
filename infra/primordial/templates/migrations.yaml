@@ -1,0 +1,17 @@
+{{- range .Values.migrations }}
+---
+apiVersion: dpoc.specpenguin.dev/v1alpha1
+kind: Migration
+metadata:
+  name: {{ .name }}
+  namespace: {{ printf "%s-%s" $.Values.dpoc.platform $.Values.dpoc.landscape }}
+spec:
+  platform: {{ $.Values.dpoc.platform }}
+  service: {{ $.Values.dpoc.service }}
+  landscape: {{ $.Values.dpoc.landscape }}
+  module: {{ .module | default "main" }}
+  to: {{ .to | toYaml | nindent 4 }}
+  fenceMaxSeconds: {{ .fenceMaxSeconds | default 30 }}
+  holdSeconds: {{ .holdSeconds | default 10 }}
+{{- end }}
+

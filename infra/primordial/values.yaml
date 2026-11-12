@@ -23,6 +23,8 @@ modules:
   email:
     mail: {type: log}
 
+migrations: []
+
 # LogtoApp record: registers tin's API audience with the landscape Logto (lithium).
 logto:
   api:
