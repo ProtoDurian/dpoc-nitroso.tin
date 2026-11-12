@@ -8,7 +8,10 @@ export class LiveAppDb {
       control: path.replace(/secret.json$/, "control.json"), legacySecret: path, ctlPort: Number(process.env.DB_CTL_PORT ?? 8081),
       writePool: 8, readPool: 4, holdMaxMs: 60000, connectTimeoutMs: 15000 });
   }
-  start() { void this.plain.start().catch(e => { console.error(JSON.stringify({ evt: "db-start-failed", code: e.code ?? "unknown" })); process.exitCode = 1; }); }
+  start() {
+    void this.plain.start().then(() => console.log(JSON.stringify({ evt: "db-control-start", db: this.plain.ackNow })))
+      .catch(e => { console.error(JSON.stringify({ evt: "db-start-failed", code: e.code ?? "unknown" })); process.exitCode = 1; });
+  }
   async stop() { await this.plain.close(); }
   get secret() { return this.plain.address; }
   async write<T>(fn: (c: any) => Promise<T>, _opts?: any) { return { v: await this.plain.begin(fn), retries: 0, heldMs: 0, kinds: [] }; }
