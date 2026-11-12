@@ -1,0 +1,19 @@
+# Defaults are a lint/local sample (pichu). In the cluster the row AppSets inject the
+# dpoc block (PLAN §4) and image.tag; infra/app/landscapes/<l>.yaml overrides per landscape.
+replicas: 2
+
+image:
+  repository: reg.dpoc.specpenguin.dev/dpoc-nitroso-tin
+  tag: "" # empty -> .Chart.AppVersion
+
+dpoc:
+  platform: nitroso
+  service: tin
+  landscape: pichu
+  cluster: pichu-opal
+  mark: opal
+  region: SIN
+  roots:
+    - c.dpoc.specpenguin.dev
+    - cf.dpoc.specpenguin.dev
+    - s.dpoc.specpenguin.dev

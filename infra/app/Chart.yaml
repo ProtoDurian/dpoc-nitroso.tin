@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dpoc-nitroso-tin
+description: app chart for nitroso.tin (notes API; runs on every cluster of a landscape)
+type: application
+version: 0.1.0
+appVersion: 0.1.0

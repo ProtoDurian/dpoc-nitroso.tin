@@ -1,0 +1,40 @@
+{{- $kindOf := dict "database" "Database" "kv" "KeyValue" "store" "Store" "email" "Email" -}}
+{{- $p := .Values.dpoc.platform -}}
+{{- $svc := .Values.dpoc.service -}}
+{{- $l := .Values.dpoc.landscape -}}
+{{- range $class, $mods := .Values.modules }}
+---
+apiVersion: dpoc.specpenguin.dev/v1alpha1
+kind: {{ index $kindOf $class }}
+metadata:
+  name: {{ $svc }}
+  namespace: {{ printf "%s-%s" $p $l }}
+  labels:
+    dpoc.specpenguin.dev/platform: {{ $p }}
+    dpoc.specpenguin.dev/service: {{ $svc }}
+    dpoc.specpenguin.dev/landscape: {{ $l }}
+spec:
+  platform: {{ $p }}
+  service: {{ $svc }}
+  landscape: {{ $l }}
+  modules:
+{{ toYaml $mods | indent 4 }}
+{{- end }}
+{{- with .Values.logto.api }}
+---
+apiVersion: dpoc.specpenguin.dev/v1alpha1
+kind: LogtoApp
+metadata:
+  name: {{ $svc }}
+  namespace: {{ printf "%s-%s" $p $l }}
+  labels:
+    dpoc.specpenguin.dev/platform: {{ $p }}
+    dpoc.specpenguin.dev/service: {{ $svc }}
+    dpoc.specpenguin.dev/landscape: {{ $l }}
+spec:
+  platform: {{ $p }}
+  service: {{ $svc }}
+  landscape: {{ $l }}
+  kind: api
+  indicator: {{ .indicator | quote }}
+{{- end }}

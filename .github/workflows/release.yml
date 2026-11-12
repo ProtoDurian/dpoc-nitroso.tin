@@ -1,0 +1,35 @@
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest # plain docker + helm, both preinstalled
+    env:
+      REG: reg.dpoc.specpenguin.dev
+      IMAGE: dpoc-nitroso-tin
+    steps:
+      - uses: actions/checkout@v4
+      - name: version
+        run: echo "VER=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: docker login
+        run: echo "${{ secrets.DPOC_REG_PASSWORD }}" | docker login "$REG" -u dpoc-ci --password-stdin
+      - name: build and push image
+        run: |
+          docker build -t "$REG/$IMAGE:$VER" .
+          docker push "$REG/$IMAGE:$VER"
+      - name: helm registry login
+        run: echo "${{ secrets.DPOC_REG_PASSWORD }}" | helm registry login "$REG" -u dpoc-ci --password-stdin
+      # order matters: image first, primordial chart, app chart LAST — a Kargo freight of
+      # this service only completes when all three exist at the same version.
+      - name: package and push primordial chart
+        run: |
+          mkdir -p dist
+          helm package infra/primordial --version "$VER" --app-version "$VER" -d dist/
+          helm push "dist/dpoc-nitroso-tin-primordial-$VER.tgz" "oci://$REG/charts"
+      - name: package and push app chart
+        run: |
+          helm package infra/app --version "$VER" --app-version "$VER" -d dist/
+          helm push "dist/dpoc-nitroso-tin-$VER.tgz" "oci://$REG/charts"

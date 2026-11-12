@@ -1,0 +1,4 @@
+# landscape pichu (dev, SIN) — dependency module choices
+modules:
+  database:
+    main: {type: neon, version: 17}

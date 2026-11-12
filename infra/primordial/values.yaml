@@ -1,0 +1,29 @@
+# Defaults are a lint/local sample (pichu). In the cluster the row AppSets inject the dpoc
+# block; infra/primordial/landscapes/<l>.yaml overrides per landscape (e.g. a module type).
+dpoc:
+  platform: nitroso
+  service: tin
+  landscape: pichu
+  mark: ""
+  region: SIN
+  roots:
+    - c.dpoc.specpenguin.dev
+    - cf.dpoc.specpenguin.dev
+    - s.dpoc.specpenguin.dev
+
+# dictionary-keyed modules per kind (PLAN §4/D4); T3 realizes each module and writes the
+# Secret <svc>-<class>-<module> into namespace <platform> of every cluster of the landscape.
+modules:
+  database:
+    main: {type: neon, version: 17}
+  kv:
+    cache: {type: upstash}
+  store:
+    files: {type: tigris}
+  email:
+    mail: {type: log}
+
+# LogtoApp record: registers tin's API audience with the landscape Logto (lithium).
+logto:
+  api:
+    indicator: "https://tin.nitroso.dpoc"

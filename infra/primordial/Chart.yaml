@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dpoc-nitroso-tin-primordial
+description: primordial chart for nitroso.tin (Database/KeyValue/Store/Email records + LogtoApp; runs ONCE per landscape on Primordial)
+type: application
+version: 0.1.0
+appVersion: 0.1.0

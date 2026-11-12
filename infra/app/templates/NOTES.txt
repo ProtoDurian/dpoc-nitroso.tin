@@ -1,0 +1,7 @@
+dpoc-nitroso-tin app chart
+landscape: {{ .Values.dpoc.landscape }}  cluster: {{ .Values.dpoc.cluster }}
+image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+ingress hosts:
+{{- range .Values.dpoc.roots }}
+  {{ $.Values.dpoc.service }}.{{ $.Values.dpoc.platform }}.{{ $.Values.dpoc.landscape }}.{{ . }}
+{{- end }}

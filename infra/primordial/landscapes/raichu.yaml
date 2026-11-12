@@ -1,0 +1,4 @@
+# landscape raichu (prod-sg, SIN) — could switch to planetscale later (H2 brief note)
+modules:
+  database:
+    main: {type: neon, version: 17}

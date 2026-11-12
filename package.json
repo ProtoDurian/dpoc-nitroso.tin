@@ -1,0 +1,16 @@
+{
+  "name": "dpoc-nitroso-tin",
+  "version": "0.1.0",
+  "private": true,
+  "module": "src/index.ts",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "pg": "^8.13.0"
+  }
+}

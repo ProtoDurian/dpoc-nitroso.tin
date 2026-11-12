@@ -1,0 +1,36 @@
+{{- $svc := .Values.dpoc.service -}}
+{{- $p := .Values.dpoc.platform -}}
+{{- $l := .Values.dpoc.landscape -}}
+{{- $hosts := list -}}
+{{- range .Values.dpoc.roots -}}
+{{- $hosts = append $hosts (printf "%s.%s.%s.%s" $svc $p $l .) -}}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Values.dpoc.platform }}
+  labels:
+    app: {{ .Chart.Name }}
+    dpoc.specpenguin.dev/platform: {{ $p }}
+    dpoc.specpenguin.dev/service: {{ $svc }}
+    dpoc.specpenguin.dev/landscape: {{ $l }}
+spec:
+  ingressClassName: traefik
+  # no secretName: traefik serves its per-cluster default cert, which carries the SANs
+  # *.<platform>.<landscape>.<root> for every known platform (PLAN §8; T3 re-issues it).
+  tls:
+    - hosts:
+{{ toYaml $hosts | indent 8 }}
+  rules:
+{{- range $root := .Values.dpoc.roots }}
+    - host: {{ printf "%s.%s.%s.%s" $svc $p $l $root | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Chart.Name }}
+                port: {number: 80}
+{{- end }}

@@ -1,0 +1,3 @@
+dpoc-nitroso-tin-primordial chart
+landscape: {{ .Values.dpoc.landscape }} — renders into namespace {{ .Values.dpoc.platform }}-{{ .Values.dpoc.landscape }}
+kinds: Database/KeyValue/Store/Email + LogtoApp (api)

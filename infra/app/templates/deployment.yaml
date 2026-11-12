@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Values.dpoc.platform }}
+  labels:
+    app: {{ .Chart.Name }}
+    dpoc.specpenguin.dev/platform: {{ .Values.dpoc.platform }}
+    dpoc.specpenguin.dev/service: {{ .Values.dpoc.service }}
+    dpoc.specpenguin.dev/landscape: {{ .Values.dpoc.landscape }}
+    dpoc.specpenguin.dev/cluster: {{ .Values.dpoc.cluster }}
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1} # spike F6 recipe
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        dpoc.specpenguin.dev/platform: {{ .Values.dpoc.platform }}
+        dpoc.specpenguin.dev/service: {{ .Values.dpoc.service }}
+        dpoc.specpenguin.dev/landscape: {{ .Values.dpoc.landscape }}
+    spec:
+      terminationGracePeriodSeconds: 30 # > preStop 5 + drain 10 (H2) + margin
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - {name: http, containerPort: 3000}
+          env:
+            - name: DPOC_CLUSTER
+              value: {{ .Values.dpoc.cluster | quote }}
+            - name: DPOC_LANDSCAPE
+              value: {{ .Values.dpoc.landscape | quote }}
+            - name: DPOC_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            - name: DPOC_ISSUER
+              value: {{ printf "https://lithium.aldehyde.%s.%s/oidc" .Values.dpoc.landscape (index .Values.dpoc.roots 0) | quote }}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec: {command: ["sleep", "5"]}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+          volumeMounts:
+            # G3: the pod does NOT start until T3 has written the database secret
+            # (stays ContainerCreating; the app then finds the file at first poll).
+            - name: database-main
+              mountPath: /deps/database-main
+              readOnly: true
+            - name: kv-cache
+              mountPath: /deps/kv-cache
+              readOnly: true
+            - name: store-files
+              mountPath: /deps/store-files
+              readOnly: true
+            - name: email-mail
+              mountPath: /deps/email-mail
+              readOnly: true
+      volumes:
+        - name: database-main
+          secret: {secretName: {{ printf "%s-database-main" .Values.dpoc.service }}} # NOT optional (G3)
+        - name: kv-cache
+          secret:
+            secretName: {{ printf "%s-kv-cache" .Values.dpoc.service }}
+            optional: true
+        - name: store-files
+          secret:
+            secretName: {{ printf "%s-store-files" .Values.dpoc.service }}
+            optional: true
+        - name: email-mail
+          secret:
+            secretName: {{ printf "%s-email-mail" .Values.dpoc.service }}
+            optional: true
