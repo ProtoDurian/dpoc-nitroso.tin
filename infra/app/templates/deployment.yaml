@@ -42,7 +42,7 @@ spec:
             - name: NODE_EXTRA_CA_CERTS   # the dpoc private CA (T3 writes ConfigMap dpoc-ca); needed to fetch the issuer JWKS
               value: /ca/ca.crt
           readinessProbe:
-            httpGet: {path: /healthz-BROKEN-v1.2.0, port: http}   # drill 3: a broken release
+            httpGet: {path: /healthz, port: http}
             periodSeconds: 2
             failureThreshold: 2
           lifecycle:
