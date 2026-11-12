@@ -15,7 +15,7 @@ dpoc:
 # Secret <svc>-<class>-<module> into namespace <platform> of every cluster of the landscape.
 modules:
   database:
-    main: {type: neon, version: 17}
+    main: {type: neon, version: 17, reload: live}
   kv:
     cache: {type: upstash}
   store:
