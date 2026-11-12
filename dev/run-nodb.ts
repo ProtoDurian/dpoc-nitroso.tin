@@ -52,7 +52,7 @@ try {
   await sleep(1500); // let it listen
 
   const hz = await fetch(`${base}/healthz`);
-  check("healthz 200 on fresh landscape", hz.status === 200, `status=${hz.status} cluster=${hz.headers.get("x-dpoc-cluster")}`);
+  check("healthz 503 before schema is ready", hz.status === 503, `status=${hz.status} cluster=${hz.headers.get("x-dpoc-cluster")}`);
 
   const info = await fetch(`${base}/api/info`);
   const infoBody = await info.json();

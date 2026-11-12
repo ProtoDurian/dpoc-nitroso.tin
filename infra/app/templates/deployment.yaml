@@ -1,8 +1,11 @@
+{{- define "tin.deployment" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Chart.Name }}
   namespace: {{ .Values.dpoc.platform }}
+  annotations:
+    reloader.stakater.com/search: "true"
   labels:
     app: {{ .Chart.Name }}
     dpoc.specpenguin.dev/platform: {{ .Values.dpoc.platform }}
@@ -18,19 +21,29 @@ spec:
       app: {{ .Chart.Name }}
   template:
     metadata:
+      annotations:
+        atomi.cloud/db-reload: live
+        atomi.cloud/db-ctl-port: "8081"
       labels:
         app: {{ .Chart.Name }}
         dpoc.specpenguin.dev/platform: {{ .Values.dpoc.platform }}
         dpoc.specpenguin.dev/service: {{ .Values.dpoc.service }}
         dpoc.specpenguin.dev/landscape: {{ .Values.dpoc.landscape }}
     spec:
-      terminationGracePeriodSeconds: 30 # > preStop 5 + drain 10 (H2) + margin
+      terminationGracePeriodSeconds: 120 # keep queued HTTP calls and /dbctl alive through a hold
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           ports:
             - {name: http, containerPort: 3000}
+            - {name: dbctl, containerPort: 8081}
           env:
+            - name: POD_UID
+              valueFrom: {fieldRef: {fieldPath: metadata.uid}}
             - name: DPOC_CLUSTER
               value: {{ .Values.dpoc.cluster | quote }}
             - name: DPOC_LANDSCAPE
@@ -41,6 +54,13 @@ spec:
               value: {{ printf "https://lithium.aldehyde.%s.%s/oidc" .Values.dpoc.landscape (index .Values.dpoc.roots 0) | quote }}
             - name: NODE_EXTRA_CA_CERTS   # the dpoc private CA (T3 writes ConfigMap dpoc-ca); needed to fetch the issuer JWKS
               value: /ca/ca.crt
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 2
@@ -51,6 +71,9 @@ spec:
           resources:
             requests: {cpu: 50m, memory: 64Mi}
           volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo
+              readOnly: true
             - name: dpoc-ca
               mountPath: /ca
               readOnly: true
@@ -68,7 +91,13 @@ spec:
             - name: email-mail
               mountPath: /deps/email-mail
               readOnly: true
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       volumes:
+        - name: podinfo
+          downwardAPI:
+            items: [{path: annotations, fieldRef: {fieldPath: metadata.annotations}}]
         - name: dpoc-ca
           configMap: {name: dpoc-ca, optional: true}
         - name: database-main
@@ -85,3 +114,10 @@ spec:
           secret:
             secretName: {{ printf "%s-email-mail" .Values.dpoc.service }}
             optional: true
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end -}}
+{{- $deployment := include "tin.deployment" . | fromYaml -}}
+{{- include "tin.checkLiveSecrets" (dict "root" . "object" $deployment) -}}
+{{ toYaml $deployment }}

@@ -6,7 +6,7 @@
 // Every module polls its secret file every 2 s and swaps its client on a generation
 // change without dropping requests. A missing file at start keeps /healthz 200;
 // API routes that need the module answer 503 "dependency <module> not ready".
-import { AppDb } from "./lib/pgapp.ts";
+import { LiveAppDb } from "./lib/liveapp.ts";
 import { KvApp } from "./lib/kvapp.ts";
 import { StoreApp } from "./lib/storeapp.ts";
 import { EmailApp } from "./lib/emailapp.ts";
@@ -15,13 +15,13 @@ export const DEPS_DIR = process.env.DPOC_DEPS_DIR ?? "/deps";
 const POLL_MS = 2000;
 
 export class Deps {
-  readonly db: AppDb;
+  readonly db: LiveAppDb;
   readonly kv: KvApp;
   readonly store: StoreApp;
   readonly email: EmailApp;
 
   constructor(dir: string = DEPS_DIR) {
-    this.db = new AppDb(`${dir}/database-main/secret.json`, { pollMs: POLL_MS, max: 10 });
+    this.db = new LiveAppDb(`${dir}/database-main/secret.json`);
     this.kv = new KvApp(`${dir}/kv-cache/secret.json`, POLL_MS);
     this.store = new StoreApp(`${dir}/store-files/secret.json`, POLL_MS);
     this.email = new EmailApp(`${dir}/email-mail/secret.json`, POLL_MS);

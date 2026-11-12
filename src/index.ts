@@ -11,6 +11,7 @@
 import pkg from "../package.json";
 import { Deps } from "./deps.ts";
 import { Auth, AuthUnavailableError } from "./auth.ts";
+import { PLAIN_SCHEMA, plainWrite, plainSnapshot } from "./plain";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const CLUSTER = process.env.DPOC_CLUSTER ?? "local";
@@ -41,6 +42,7 @@ async function ensureSchema() {
         (c) => c.query(`CREATE TABLE IF NOT EXISTS notes(id text primary key, text text, cluster text, created_at timestamptz default now())`),
         { idempotent: true },
       );
+      for (const sql of PLAIN_SCHEMA) await deps.db.plain.query(sql);
       schemaReady = true;
       ensureWaitMs = 1000;
       log("schema-ready");
@@ -119,11 +121,32 @@ async function route(req: Request): Promise<Response> {
   }
 
   if (path === "/healthz") {
-    return draining ? json(req, 503, { ok: false, draining: true }) : json(req, 200, { ok: true });
+    return draining || !schemaReady ? json(req, 503, { ok: false, draining, schemaReady }) : json(req, 200, { ok: true });
   }
 
   if (path === "/api/info") {
-    return json(req, 200, { cluster: CLUSTER, landscape: LANDSCAPE, version: VERSION });
+    return json(req, 200, { cluster: CLUSTER, landscape: LANDSCAPE, version: VERSION, pod: process.env.POD_UID, db: deps.db.plain.ackNow });
+  }
+
+  if (path.startsWith("/api/plain")) {
+    if (!schemaReady) return json(req, 503, { error: "schema not ready" });
+    const a = await bearer(req); if (a instanceof Response) return a;
+    if (path === "/api/plain" && method === "POST") {
+      const result = await plainWrite(deps.db.plain, await req.json());
+      return json(req, 200, { ...result, cluster: CLUSTER, pod: process.env.POD_UID });
+    }
+    if (path === "/api/plain/seed" && method === "POST") {
+      const b = await req.json() as any;
+      if (!Number.isSafeInteger(b.base) || b.base < 0 || !Number.isSafeInteger(b.count) || b.count < 2 || b.count > 10000) return json(req, 400, { error: "invalid range" });
+      await deps.db.plain.query("insert into plain_acct(id) select generate_series($1::int,$2::int)", [b.base, b.base + b.count - 1]);
+      return json(req, 200, { seeded: b.count });
+    }
+    if (path === "/api/plain/snapshot" && method === "GET") {
+      const base = Number(u.searchParams.get("base")), count = Number(u.searchParams.get("count"));
+      if (!Number.isSafeInteger(base) || base < 0 || !Number.isSafeInteger(count) || count < 2 || count > 10000) return json(req, 400, { error: "invalid range" });
+      return json(req, 200, await plainSnapshot(deps.db.plain, base, count));
+    }
+    return json(req, 404, { error: "not found" });
   }
 
   if (path === "/api/whoami") {
@@ -233,13 +256,15 @@ function shutdown(sig: string) {
   if (draining) return;
   draining = true;
   log("draining", { sig, serveMs: DRAIN_MS });
-  const hard = setTimeout(() => process.exit(0), DRAIN_MS + 5000);
+  // Keep /dbctl alive while HTTP callers wait behind a hold. Kubelet allows 120 s including preStop.
+  const hard = setTimeout(() => { log("shutdown-deadline", { db: deps.db.plain.ackNow }); process.exit(1); }, 105000);
   setTimeout(async () => {
     try {
-      server.stop(); // stop accepting; in-flight requests finish
+      await server.stop(); // stop accepting, then wait for every queued/in-flight HTTP response
       await deps.stop();
       auth.stop();
     } finally {
+      clearTimeout(hard);
       process.exit(0);
     }
   }, DRAIN_MS);
