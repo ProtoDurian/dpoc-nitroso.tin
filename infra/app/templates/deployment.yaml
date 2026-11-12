@@ -39,6 +39,8 @@ spec:
               value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             - name: DPOC_ISSUER
               value: {{ printf "https://lithium.aldehyde.%s.%s/oidc" .Values.dpoc.landscape (index .Values.dpoc.roots 0) | quote }}
+            - name: NODE_EXTRA_CA_CERTS   # the dpoc private CA (T3 writes ConfigMap dpoc-ca); needed to fetch the issuer JWKS
+              value: /ca/ca.crt
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 2
@@ -49,6 +51,9 @@ spec:
           resources:
             requests: {cpu: 50m, memory: 64Mi}
           volumeMounts:
+            - name: dpoc-ca
+              mountPath: /ca
+              readOnly: true
             # G3: the pod does NOT start until T3 has written the database secret
             # (stays ContainerCreating; the app then finds the file at first poll).
             - name: database-main
@@ -64,6 +69,8 @@ spec:
               mountPath: /deps/email-mail
               readOnly: true
       volumes:
+        - name: dpoc-ca
+          configMap: {name: dpoc-ca, optional: true}
         - name: database-main
           secret: {secretName: {{ printf "%s-database-main" .Values.dpoc.service }}} # NOT optional (G3)
         - name: kv-cache
