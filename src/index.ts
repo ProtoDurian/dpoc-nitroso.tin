@@ -229,6 +229,7 @@ async function route(req: Request): Promise<Response> {
 }
 
 // ---- serve ----
+let activeRequests = 0;
 deps.start();
 auth.start();
 setInterval(ensureSchema, 2000);
@@ -237,6 +238,7 @@ ensureSchema();
 const server = Bun.serve({
   port: PORT,
   fetch(req) {
+    activeRequests++;
     const t0 = Date.now();
     return route(req)
       .then((r) => {
@@ -245,8 +247,8 @@ const server = Bun.serve({
       })
       .catch((e) => {
         log("http-error", { method: req.method, path: new URL(req.url).pathname, err: String(e) });
-        return json(req, 500, { error: "internal" });
-      });
+        return json(req, 500, { error: "internal", code: e?.code ?? "INTERNAL" });
+      }).finally(() => { activeRequests--; });
   },
 });
 log("listening", { port: PORT, landscape: LANDSCAPE, version: VERSION, issuer: process.env.DPOC_ISSUER });
@@ -261,6 +263,8 @@ function shutdown(sig: string) {
   setTimeout(async () => {
     try {
       await server.stop(); // stop accepting, then wait for every queued/in-flight HTTP response
+      while (activeRequests > 0 || deps.db.plain.stats.waiting > 0 || deps.db.plain.stats.inflight > 0) await Bun.sleep(20);
+      await Bun.sleep(50); // allow completed responses to flush before closing dependency clients
       await deps.stop();
       auth.stop();
     } finally {
