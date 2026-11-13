@@ -1,7 +1,7 @@
 # landscape pichu (dev, SIN) — dependency module choices
 modules:
   database:
-    main: {type: neon, version: 17}
+    main: {type: planetscale, version: 17}
 migrations:
   - name: tin-neon-to-ps
     module: main
@@ -16,6 +16,14 @@ migrations:
     to:
       type: neon
       targetName: dpoc-r2-db-pichu-neon-mwe6484z
+      drainConfirmMs: 10000
+    fenceMaxSeconds: 30
+    holdSeconds: 10
+  - name: tin-neon-to-ps-final
+    module: main
+    to:
+      type: planetscale
+      targetName: dpoc-r2-db-pichu-tin-mwe6484z
       drainConfirmMs: 10000
     fenceMaxSeconds: 30
     holdSeconds: 10
