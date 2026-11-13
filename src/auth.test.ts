@@ -98,3 +98,43 @@ describe("Auth (fake JWKS)", () => {
     expect(payload.sub).toBe("user-8");
   });
 });
+
+// ---- C-04-21 (round 2, logto helper): keys survive an issuer outage; a cold pod is not ready; forced refreshes are rate-limited ----
+describe("round 2: last good keys", () => {
+  test("cold start while the issuer is down: not ready; after it returns: ready, no request ever waited on the issuer", async () => {
+    const k = await newKey("c1");
+    currentJwks = { keys: [k.jwk] };
+    stopJwks(); // issuer down
+    const a = new Auth(ISSUER_BASE, AUD);
+    a.start();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(a.ready).toBe(false);
+    startJwks(); // issuer back (the retry loop picks it up within its backoff)
+    for (let i = 0; i < 40 && !a.ready; i++) await new Promise((r) => setTimeout(r, 100));
+    expect(a.ready).toBe(true);
+    const tok = await mint(k.privateKey, "c1", "u1");
+    stopJwks(); // issuer down again: verification must keep working from the cached keys, instantly
+    const t0 = performance.now();
+    const ok: string[] = [];
+    for (let i = 0; i < 200; i++) ok.push(String((await a.verify(tok)).sub));
+    expect(ok.every((s) => s === "u1")).toBe(true);
+    expect(performance.now() - t0).toBeLessThan(500);
+    a.stop();
+    startJwks();
+  });
+  test("unknown key id: forced refresh at most once per 10 s", async () => {
+    stopJwks();
+    startJwks();
+    const k = await newKey("c2");
+    currentJwks = { keys: [k.jwk] };
+    const a = new Auth(ISSUER_BASE, AUD);
+    await a.refresh(true);
+    let hits = 0;
+    stopJwks();
+    server = Bun.serve({ port: 46111, fetch(req) { if (new URL(req.url).pathname === "/oidc/jwks") { hits++; return Response.json(currentJwks); } return new Response("nf", { status: 404 }); } });
+    const other = await newKey("zzz");
+    const bad = await mint(other.privateKey, "zzz", "x");
+    for (let i = 0; i < 20; i++) await a.verify(bad).catch(() => {});
+    expect(hits).toBeLessThanOrEqual(1);
+  });
+});

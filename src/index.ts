@@ -1,5 +1,5 @@
 // dpoc-nitroso.tin — the notes API (PLAN §5).
-//   GET  /healthz        200 (503 while draining)          — no auth
+//   GET  /healthz        200 (503 while draining or before the first JWKS is loaded)          — no auth
 //   GET  /api/info       {cluster, landscape, version}     — no auth
 //   GET  /api/whoami     {sub, cluster}                    — Bearer (audience https://tin.nitroso.dpoc)
 //   POST /api/notes      {id, cluster}                     — Bearer; Idempotency-Key header = row id
@@ -121,7 +121,7 @@ async function route(req: Request): Promise<Response> {
   }
 
   if (path === "/healthz") {
-    return draining || !schemaReady ? json(req, 503, { ok: false, draining, schemaReady }) : json(req, 200, { ok: true });
+    return draining || !schemaReady || !auth.ready ? json(req, 503, { ok: false, draining, schemaReady, authKeys: auth.ready }) : json(req, 200, { ok: true });
   }
 
   if (path === "/api/info") {
